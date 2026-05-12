@@ -6,6 +6,8 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
+const contactRoutes = require('./routes/contact');
+
 
 
 // Load environment variables
@@ -99,7 +101,7 @@ app.use('/api/posts', postRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/friends', friendRoutes);
 app.use('/api/chat', chatRoutes);
-
+app.use('/api/contact', contactRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
