@@ -1,9 +1,8 @@
-// backend/controllers/postController.js
 const Post = require('../models/Post');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
-const fs = require('fs');
 const path = require('path');
+const fs = require('fs');
 
 // Create post with images
 exports.createPost = async (req, res) => {
@@ -11,11 +10,11 @@ exports.createPost = async (req, res) => {
     const { content } = req.body;
     let imageUrls = [];
     
-    // Handle image uploads
+    // Handle image uploads from multer
     if (req.files && req.files.length > 0) {
       imageUrls = req.files.map(file => {
         // Return the URL path to access the image
-        return `${req.protocol}://${req.get('host')}/uploads/${file.filename}`;
+        return `${req.protocol}://${req.get('host')}/uploads/posts/${file.filename}`;
       });
     }
     
@@ -60,7 +59,7 @@ exports.updatePost = async (req, res) => {
       // Delete physical files
       for (const imageUrl of imagesToRemove) {
         const filename = path.basename(imageUrl);
-        const filePath = path.join(__dirname, '../uploads', filename);
+        const filePath = path.join(__dirname, '../uploads/posts', filename);
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
         }
@@ -71,7 +70,7 @@ exports.updatePost = async (req, res) => {
     // Add new images
     if (req.files && req.files.length > 0) {
       const newImages = req.files.map(file => 
-        `${req.protocol}://${req.get('host')}/uploads/${file.filename}`
+        `${req.protocol}://${req.get('host')}/uploads/posts/${file.filename}`
       );
       post.images = [...post.images, ...newImages];
     }
@@ -106,7 +105,7 @@ exports.deletePost = async (req, res) => {
     if (post.images && post.images.length > 0) {
       for (const imageUrl of post.images) {
         const filename = path.basename(imageUrl);
-        const filePath = path.join(__dirname, '../uploads', filename);
+        const filePath = path.join(__dirname, '../uploads/posts', filename);
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
         }

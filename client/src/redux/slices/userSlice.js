@@ -29,16 +29,37 @@ export const updateUser = createAsyncThunk(
         return rejectWithValue('User ID not found');
       }
       
-      // Only send fields that are provided
-      const updateData = {};
-      if (userData.name && userData.name.trim()) updateData.name = userData.name.trim();
-      if (userData.bio !== undefined) updateData.bio = userData.bio;
-      if (userData.profilePicture) updateData.profilePicture = userData.profilePicture;
-      if (userData.coverPhoto) updateData.coverPhoto = userData.coverPhoto;
+      // Create FormData if there's a file
+      let config = {
+        headers: { 
+          'x-auth-token': getToken(),
+          'Content-Type': 'application/json'
+        }
+      };
       
-      const response = await axios.put(`${API_URL}/users/${userId}`, updateData, {
-        headers: { 'x-auth-token': getToken() }
-      });
+      let data = {};
+      
+      // Only send fields that are provided and not undefined
+      if (userData.name !== undefined && userData.name !== null) {
+        data.name = userData.name;
+      }
+      if (userData.bio !== undefined && userData.bio !== null) {
+        data.bio = userData.bio;
+      }
+      if (userData.profilePicture !== undefined && userData.profilePicture !== null) {
+        data.profilePicture = userData.profilePicture;
+      }
+      if (userData.coverPhoto !== undefined && userData.coverPhoto !== null) {
+        data.coverPhoto = userData.coverPhoto;
+      }
+      
+      // If it's a FormData (file upload), use multipart
+      if (userData instanceof FormData) {
+        config.headers['Content-Type'] = 'multipart/form-data';
+        data = userData;
+      }
+      
+      const response = await axios.put(`${API_URL}/users/${userId}`, data, config);
       
       // Update local storage
       const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -47,6 +68,7 @@ export const updateUser = createAsyncThunk(
       
       return response.data;
     } catch (error) {
+      console.error('Update user error:', error.response?.data);
       return rejectWithValue(error.response?.data?.message || error.message);
     }
   }

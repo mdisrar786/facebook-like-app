@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
-const { upload } = require('../middleware/upload');
+const { uploadMultiple } = require('../middleware/upload');
 const {
   createPost,
   getFeed,
@@ -17,8 +17,8 @@ const {
 } = require('../controllers/postController');
 
 // Post routes with image upload
-router.post('/', auth, upload.array('images', 5), createPost);
-router.put('/:id', auth, upload.array('images', 5), updatePost);
+router.post('/', auth, uploadMultiple, createPost);
+router.put('/:id', auth, uploadMultiple, updatePost);
 router.get('/feed', auth, getFeed);
 router.get('/saved', auth, getSavedPosts);
 router.get('/user/:userId', auth, getUserPosts);
