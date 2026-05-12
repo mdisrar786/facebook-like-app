@@ -8,9 +8,10 @@ export const sendMessage = createAsyncThunk(
   'chat/sendMessage',
   async ({ receiverId, message }, { rejectWithValue }) => {
     try {
-      const response = await axios.post(`${API_URL}/chat/message`, { receiverId, message }, {
-        headers: { 'x-auth-token': getToken() }
-      });
+      const response = await axios.post(`${API_URL}/chat/message`, 
+        { receiverId, message }, 
+        { headers: { 'x-auth-token': getToken() } }
+      );
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
@@ -46,12 +47,27 @@ export const getChatList = createAsyncThunk(
   }
 );
 
+export const getUnreadMessageCount = createAsyncThunk(
+  'chat/getUnreadCount',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await axios.get(`${API_URL}/chat/unread-count`, {
+        headers: { 'x-auth-token': getToken() }
+      });
+      return response.data.unreadCount;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
 const chatSlice = createSlice({
   name: 'chat',
   initialState: {
     chats: [],
     currentChat: null,
     messages: [],
+    unreadCount: 0,
     isLoading: false,
     error: null
   },
@@ -61,15 +77,21 @@ const chatSlice = createSlice({
     },
     addNewMessage: (state, action) => {
       state.messages.push(action.payload);
-      // Update chat list last message
-      const chatIndex = state.chats.findIndex(c => c.user._id === action.payload.senderId);
+      const chatIndex = state.chats.findIndex(c => c.user?._id === action.payload.senderId);
       if (chatIndex !== -1) {
         state.chats[chatIndex].lastMessage = action.payload.message;
         state.chats[chatIndex].lastMessageTime = new Date();
+        if (action.payload.receiverId === state.currentChat?.user?._id) {
+          state.chats[chatIndex].unreadCount = (state.chats[chatIndex].unreadCount || 0) + 1;
+          state.unreadCount++;
+        }
       }
     },
     clearMessages: (state) => {
       state.messages = [];
+    },
+    resetUnreadCount: (state) => {
+      state.unreadCount = 0;
     }
   },
   extraReducers: (builder) => {
@@ -80,6 +102,8 @@ const chatSlice = createSlice({
       .addCase(getChatList.fulfilled, (state, action) => {
         state.isLoading = false;
         state.chats = action.payload;
+        // Calculate total unread count
+        state.unreadCount = action.payload.reduce((total, chat) => total + (chat.unreadCount || 0), 0);
       })
       .addCase(getChatList.rejected, (state, action) => {
         state.isLoading = false;
@@ -98,9 +122,12 @@ const chatSlice = createSlice({
       })
       .addCase(sendMessage.fulfilled, (state, action) => {
         state.messages.push(action.payload);
+      })
+      .addCase(getUnreadMessageCount.fulfilled, (state, action) => {
+        state.unreadCount = action.payload;
       });
   }
 });
 
-export const { setCurrentChat, addNewMessage, clearMessages } = chatSlice.actions;
+export const { setCurrentChat, addNewMessage, clearMessages, resetUnreadCount } = chatSlice.actions;
 export default chatSlice.reducer;

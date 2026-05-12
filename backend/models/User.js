@@ -63,4 +63,10 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Remove required validation for updates
+userSchema.pre('findOneAndUpdate', function(next) {
+  this.options.runValidators = false;
+  next();
+});
+
 module.exports = mongoose.models.User || mongoose.model('User', userSchema);

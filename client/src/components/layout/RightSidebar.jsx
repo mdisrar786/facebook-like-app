@@ -14,9 +14,10 @@ import {
   InputAdornment,
   Badge,
   IconButton,
-  CircularProgress
+  CircularProgress,
+  Divider
 } from '@mui/material';
-import { Search, PersonAdd, Chat, Send } from '@mui/icons-material';
+import { Search, PersonAdd, Chat, Send, Close } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { sendFriendRequest, getFriends } from '../../redux/slices/friendSlice';
@@ -102,6 +103,8 @@ const RightSidebar = () => {
     navigate(`/profile/${userId}`);
   };
 
+  const onlineFriends = friends.filter(f => f.isOnline);
+
   return (
     <Box>
       {/* Search Bar */}
@@ -126,53 +129,71 @@ const RightSidebar = () => {
             )
           }}
         />
+        {searchResults.length > 0 && (
+          <Box sx={{ mt: 2 }}>
+            {searchResults.map((user) => (
+              <Box key={user._id} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, p: 1, bgcolor: 'action.hover', borderRadius: 1 }}>
+                <Avatar 
+                  src={user.profilePicture} 
+                  sx={{ width: 40, height: 40, cursor: 'pointer' }}
+                  onClick={() => handleViewProfile(user._id)}
+                >
+                  {user.name?.charAt(0)}
+                </Avatar>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="body2" fontWeight="bold">{user.name}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {user.isOnline ? 'Online' : 'Offline'}
+                  </Typography>
+                </Box>
+                <Button size="small" variant="contained" onClick={() => handleSendRequest(user._id)}>
+                  Add
+                </Button>
+                <IconButton size="small" onClick={() => handleStartChat(user._id)}>
+                  <Chat fontSize="small" />
+                </IconButton>
+              </Box>
+            ))}
+          </Box>
+        )}
       </Paper>
 
-      {/* Search Results */}
-      {searchResults.length > 0 && (
+      {/* Online Friends Section */}
+      {onlineFriends.length > 0 && (
         <Paper sx={{ p: 2, mb: 3 }}>
-          <Typography variant="h6" sx={{ mb: 2 }}>Search Results</Typography>
+          <Typography variant="h6" sx={{ mb: 2 }}>Online Friends ({onlineFriends.length})</Typography>
           <List>
-            {searchResults.map((user) => (
-              <ListItem key={user._id} sx={{ px: 0, mb: 1 }}>
+            {onlineFriends.map((friend) => (
+              <ListItem key={friend._id} sx={{ px: 0, mb: 1 }}>
                 <ListItemAvatar>
                   <Badge
                     color="success"
                     variant="dot"
-                    invisible={!user.isOnline}
+                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
                   >
                     <Avatar 
-                      src={user.profilePicture}
+                      src={friend.profilePicture}
                       sx={{ cursor: 'pointer' }}
-                      onClick={() => handleViewProfile(user._id)}
+                      onClick={() => handleViewProfile(friend._id)}
                     >
-                      {user.name?.charAt(0)}
+                      {friend.name?.charAt(0)}
                     </Avatar>
                   </Badge>
                 </ListItemAvatar>
                 <ListItemText 
                   primary={
                     <Typography 
-                      variant="subtitle2" 
+                      variant="subtitle2"
                       sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
-                      onClick={() => handleViewProfile(user._id)}
+                      onClick={() => handleViewProfile(friend._id)}
                     >
-                      {user.name}
+                      {friend.name}
                     </Typography>
                   }
-                  secondary={user.isOnline ? 'Online' : 'Offline'}
+                  secondary="Online"
                 />
-                <Button 
-                  size="small" 
-                  variant="contained" 
-                  startIcon={<PersonAdd />}
-                  onClick={() => handleSendRequest(user._id)}
-                  sx={{ borderRadius: 5, mr: 1 }}
-                >
-                  Add
-                </Button>
-                <IconButton size="small" onClick={() => handleStartChat(user._id)}>
-                  <Chat fontSize="small" />
+                <IconButton size="small" onClick={() => handleStartChat(friend._id)}>
+                  <Send fontSize="small" />
                 </IconButton>
               </ListItem>
             ))}
@@ -180,8 +201,8 @@ const RightSidebar = () => {
         </Paper>
       )}
 
-      {/* Suggestions */}
-      <Paper sx={{ p: 2, mb: 3 }}>
+      {/* People You May Know */}
+      <Paper sx={{ p: 2 }}>
         <Typography variant="h6" sx={{ mb: 2 }}>People You May Know</Typography>
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
@@ -233,53 +254,6 @@ const RightSidebar = () => {
                 </Button>
                 <IconButton size="small" onClick={() => handleStartChat(user._id)}>
                   <Chat fontSize="small" />
-                </IconButton>
-              </ListItem>
-            ))}
-          </List>
-        )}
-      </Paper>
-
-      {/* Online Friends */}
-      <Paper sx={{ p: 2 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>Online Friends</Typography>
-        {friends.filter(f => f.isOnline).length === 0 ? (
-          <Typography variant="body2" color="text.secondary" align="center">
-            No friends online
-          </Typography>
-        ) : (
-          <List>
-            {friends.filter(f => f.isOnline).map((friend) => (
-              <ListItem key={friend._id} sx={{ px: 0, mb: 1 }}>
-                <ListItemAvatar>
-                  <Badge
-                    color="success"
-                    variant="dot"
-                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                  >
-                    <Avatar 
-                      src={friend.profilePicture}
-                      sx={{ cursor: 'pointer' }}
-                      onClick={() => handleViewProfile(friend._id)}
-                    >
-                      {friend.name?.charAt(0)}
-                    </Avatar>
-                  </Badge>
-                </ListItemAvatar>
-                <ListItemText 
-                  primary={
-                    <Typography 
-                      variant="subtitle2"
-                      sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
-                      onClick={() => handleViewProfile(friend._id)}
-                    >
-                      {friend.name}
-                    </Typography>
-                  }
-                  secondary="Online"
-                />
-                <IconButton size="small" onClick={() => handleStartChat(friend._id)}>
-                  <Send fontSize="small" />
                 </IconButton>
               </ListItem>
             ))}

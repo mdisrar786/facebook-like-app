@@ -32,21 +32,42 @@ exports.updateUser = async (req, res) => {
     }
     
     // Check if user is updating their own profile
-    if (user.id !== req.user.id) {
+    if (user._id.toString() !== req.user.id) {
       return res.status(401).json({ message: 'Not authorized to update this profile' });
     }
     
-    // Update fields
-    if (name) user.name = name;
-    if (bio !== undefined) user.bio = bio;
-    if (profilePicture) user.profilePicture = profilePicture;
-    if (coverPhoto) user.coverPhoto = coverPhoto;
+    // Update only provided fields, but ensure name is never empty
+    if (name && name.trim() !== '') {
+      user.name = name.trim();
+    }
+    
+    if (bio !== undefined) {
+      user.bio = bio;
+    }
+    
+    if (profilePicture) {
+      user.profilePicture = profilePicture;
+    }
+    
+    if (coverPhoto) {
+      user.coverPhoto = coverPhoto;
+    }
+    
+    // Validate before saving
+    const validationError = user.validateSync();
+    if (validationError) {
+      return res.status(400).json({ 
+        message: 'Validation failed', 
+        errors: validationError.errors 
+      });
+    }
     
     await user.save();
     
     // Return updated user without password
     const updatedUser = {
-      id: user.id,
+      _id: user._id,
+      id: user._id,
       name: user.name,
       email: user.email,
       profilePicture: user.profilePicture,
@@ -54,6 +75,7 @@ exports.updateUser = async (req, res) => {
       bio: user.bio,
       followers: user.followers,
       following: user.following,
+      friends: user.friends,
       isOnline: user.isOnline,
       lastSeen: user.lastSeen,
       createdAt: user.createdAt

@@ -8,7 +8,7 @@ const notificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['like', 'comment', 'follow', 'share', 'friend_request', 'friend_request_accepted'],
+    enum: ['like', 'comment', 'follow', 'share', 'friend_request', 'friend_request_accepted', 'message'],
     required: true
   },
   fromUserId: {
@@ -26,6 +26,9 @@ const notificationSchema = new mongoose.Schema({
   },
   message: {
     type: String
+  },
+  data: {
+    type: mongoose.Schema.Types.Mixed
   }
 }, {
   timestamps: true

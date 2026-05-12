@@ -16,7 +16,8 @@ import {
   Tabs,
   Tab,
   Chip,
-  Badge
+  Badge,
+  IconButton
 } from '@mui/material';
 import {
   Favorite,
@@ -24,10 +25,10 @@ import {
   PersonAdd,
   CheckCircle,
   Cancel,
-  PersonAdd as PersonAddIcon
+  PersonAdd as PersonAddIcon,
+  Send as SendIcon
 } from '@mui/icons-material';
 import { getFriendRequests, acceptFriendRequest, rejectFriendRequest } from '../redux/slices/friendSlice';
-import { markNotificationAsRead } from '../redux/slices/notificationSlice';
 import { formatDistanceToNow } from 'date-fns';
 
 const Notifications = () => {
@@ -35,7 +36,6 @@ const Notifications = () => {
   const navigate = useNavigate();
   const { user: currentUser } = useSelector((state) => state.auth);
   const { friendRequests } = useSelector((state) => state.friends);
-  const { notifications: allNotifications } = useSelector((state) => state.notifications);
   const [tabValue, setTabValue] = useState(0);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -77,16 +77,18 @@ const Notifications = () => {
     navigate(`/profile/${userId}`);
   };
 
+  const handleStartChat = (userId) => {
+    navigate(`/messages/${userId}`);
+  };
+
   const handleNotificationClick = async (notification) => {
     if (!notification.read) {
-      // Mark as read
       try {
         const token = localStorage.getItem('token');
         await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/notifications/${notification._id}/read`, {
           method: 'PUT',
           headers: { 'x-auth-token': token }
         });
-        // Update local state
         setNotifications(notifications.map(n => 
           n._id === notification._id ? { ...n, read: true } : n
         ));
@@ -96,10 +98,11 @@ const Notifications = () => {
     }
     
     // Navigate based on notification type
-    if (notification.type === 'friend_request' || notification.type === 'friend_request_accepted') {
+    if (notification.type === 'message') {
+      navigate(`/messages/${notification.fromUserId?._id}`);
+    } else if (notification.type === 'friend_request' || notification.type === 'friend_request_accepted') {
       navigate(`/profile/${notification.fromUserId?._id}`);
     } else if (notification.postId) {
-      // Scroll to post or navigate to post
       navigate(`/`);
     }
   };
@@ -108,6 +111,7 @@ const Notifications = () => {
     switch(type) {
       case 'like': return <Favorite color="error" />;
       case 'comment': return <Chat color="primary" />;
+      case 'message': return <SendIcon color="info" />;
       case 'friend_request': return <PersonAdd color="success" />;
       case 'friend_request_accepted': return <CheckCircle color="primary" />;
       default: return <PersonAddIcon />;
@@ -116,6 +120,8 @@ const Notifications = () => {
 
   const getNotificationMessage = (notification) => {
     switch(notification.type) {
+      case 'message':
+        return notification.message;
       case 'friend_request':
         return `${notification.fromUserId?.name} sent you a friend request`;
       case 'friend_request_accepted':
@@ -272,6 +278,17 @@ const Notifications = () => {
                         </Typography>
                       }
                     />
+                    {notification.type === 'message' && (
+                      <IconButton 
+                        size="small" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStartChat(notification.fromUserId?._id);
+                        }}
+                      >
+                        <SendIcon fontSize="small" />
+                      </IconButton>
+                    )}
                     {!notification.read && (
                       <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: '#1877f2', ml: 1 }} />
                     )}

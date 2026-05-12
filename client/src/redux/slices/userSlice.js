@@ -29,7 +29,14 @@ export const updateUser = createAsyncThunk(
         return rejectWithValue('User ID not found');
       }
       
-      const response = await axios.put(`${API_URL}/users/${userId}`, userData, {
+      // Only send fields that are provided
+      const updateData = {};
+      if (userData.name && userData.name.trim()) updateData.name = userData.name.trim();
+      if (userData.bio !== undefined) updateData.bio = userData.bio;
+      if (userData.profilePicture) updateData.profilePicture = userData.profilePicture;
+      if (userData.coverPhoto) updateData.coverPhoto = userData.coverPhoto;
+      
+      const response = await axios.put(`${API_URL}/users/${userId}`, updateData, {
         headers: { 'x-auth-token': getToken() }
       });
       
@@ -99,7 +106,7 @@ const userSlice = createSlice({
       })
       .addCase(updateUser.fulfilled, (state, action) => {
         state.isLoading = false;
-        if (state.currentProfile && state.currentProfile._id === action.payload.id) {
+        if (state.currentProfile && state.currentProfile._id === action.payload._id) {
           state.currentProfile = { ...state.currentProfile, ...action.payload };
         }
       })

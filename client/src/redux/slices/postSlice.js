@@ -20,6 +20,21 @@ export const fetchFeed = createAsyncThunk(
   }
 );
 
+// Fetch user posts (for profile page)
+export const fetchUserPosts = createAsyncThunk(
+  'posts/fetchUserPosts',
+  async (userId, { rejectWithValue }) => {
+    try {
+      const response = await axios.get(`${API_URL}/posts/user/${userId}`, {
+        headers: { 'x-auth-token': getToken() }
+      });
+      return { userId, posts: response.data.posts };
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
 // Create new post
 export const createPost = createAsyncThunk(
   'posts/createPost',
@@ -166,6 +181,7 @@ const postSlice = createSlice({
   initialState: {
     posts: [],
     savedPosts: [],
+    userPosts: [], // Add this for user specific posts
     currentPage: 1,
     totalPages: 1,
     hasMore: true,
@@ -178,14 +194,22 @@ const postSlice = createSlice({
       state.currentPage = 1;
       state.hasMore = true;
     },
+    clearUserPosts: (state) => {
+      state.userPosts = [];
+    },
     updatePostInList: (state, action) => {
       const index = state.posts.findIndex(p => p._id === action.payload._id);
       if (index !== -1) {
         state.posts[index] = action.payload;
       }
+      const userPostIndex = state.userPosts.findIndex(p => p._id === action.payload._id);
+      if (userPostIndex !== -1) {
+        state.userPosts[userPostIndex] = action.payload;
+      }
     },
     removePostFromList: (state, action) => {
       state.posts = state.posts.filter(p => p._id !== action.payload);
+      state.userPosts = state.userPosts.filter(p => p._id !== action.payload);
     },
     clearSavedPosts: (state) => {
       state.savedPosts = [];
@@ -213,9 +237,23 @@ const postSlice = createSlice({
         state.error = action.payload?.message || 'Failed to fetch posts';
       })
       
+      // Fetch User Posts (for profile)
+      .addCase(fetchUserPosts.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(fetchUserPosts.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.userPosts = action.payload.posts;
+      })
+      .addCase(fetchUserPosts.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload?.message || 'Failed to fetch user posts';
+      })
+      
       // Create Post
       .addCase(createPost.fulfilled, (state, action) => {
         state.posts = [action.payload, ...state.posts];
+        state.userPosts = [action.payload, ...state.userPosts];
       })
       
       // Update Post
@@ -223,6 +261,10 @@ const postSlice = createSlice({
         const index = state.posts.findIndex(p => p._id === action.payload._id);
         if (index !== -1) {
           state.posts[index] = action.payload;
+        }
+        const userPostIndex = state.userPosts.findIndex(p => p._id === action.payload._id);
+        if (userPostIndex !== -1) {
+          state.userPosts[userPostIndex] = action.payload;
         }
         const savedIndex = state.savedPosts.findIndex(p => p._id === action.payload._id);
         if (savedIndex !== -1) {
@@ -233,6 +275,7 @@ const postSlice = createSlice({
       // Delete Post
       .addCase(deletePost.fulfilled, (state, action) => {
         state.posts = state.posts.filter(p => p._id !== action.payload);
+        state.userPosts = state.userPosts.filter(p => p._id !== action.payload);
         state.savedPosts = state.savedPosts.filter(p => p._id !== action.payload);
       })
       
@@ -246,6 +289,17 @@ const postSlice = createSlice({
             }
           } else {
             post.likes = post.likes.filter(id => id !== action.meta.arg);
+          }
+        }
+        // Update in userPosts
+        const userPost = state.userPosts.find(p => p._id === action.payload.postId);
+        if (userPost) {
+          if (action.payload.liked) {
+            if (!userPost.likes.includes(action.meta.arg)) {
+              userPost.likes.push(action.meta.arg);
+            }
+          } else {
+            userPost.likes = userPost.likes.filter(id => id !== action.meta.arg);
           }
         }
         // Also update in saved posts
@@ -267,6 +321,10 @@ const postSlice = createSlice({
         if (post) {
           post.comments = action.payload.comments;
         }
+        const userPost = state.userPosts.find(p => p._id === action.payload.postId);
+        if (userPost) {
+          userPost.comments = action.payload.comments;
+        }
         const savedPost = state.savedPosts.find(p => p._id === action.payload.postId);
         if (savedPost) {
           savedPost.comments = action.payload.comments;
@@ -278,6 +336,10 @@ const postSlice = createSlice({
         const post = state.posts.find(p => p._id === action.payload.postId);
         if (post) {
           post.comments = action.payload.comments;
+        }
+        const userPost = state.userPosts.find(p => p._id === action.payload.postId);
+        if (userPost) {
+          userPost.comments = action.payload.comments;
         }
         const savedPost = state.savedPosts.find(p => p._id === action.payload.postId);
         if (savedPost) {
@@ -291,6 +353,10 @@ const postSlice = createSlice({
         if (post) {
           post.comments = action.payload.comments;
         }
+        const userPost = state.userPosts.find(p => p._id === action.payload.postId);
+        if (userPost) {
+          userPost.comments = action.payload.comments;
+        }
         const savedPost = state.savedPosts.find(p => p._id === action.payload.postId);
         if (savedPost) {
           savedPost.comments = action.payload.comments;
@@ -299,10 +365,13 @@ const postSlice = createSlice({
       
       // Save Post
       .addCase(savePost.fulfilled, (state, action) => {
-        // Update the saved status in the post
         const post = state.posts.find(p => p._id === action.payload.postId);
         if (post) {
           post.isSaved = action.payload.saved;
+        }
+        const userPost = state.userPosts.find(p => p._id === action.payload.postId);
+        if (userPost) {
+          userPost.isSaved = action.payload.saved;
         }
       })
       
@@ -323,6 +392,7 @@ const postSlice = createSlice({
 
 export const { 
   clearPosts, 
+  clearUserPosts,
   updatePostInList, 
   removePostFromList,
   clearSavedPosts 

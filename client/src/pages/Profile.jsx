@@ -21,7 +21,8 @@ import {
   DialogActions,
   Alert,
   CircularProgress,
-  Badge
+  Badge,
+  Divider
 } from '@mui/material';
 import { 
   Edit, 
@@ -35,6 +36,7 @@ import {
 import PostCard from '../components/posts/PostCard';
 import { sendFriendRequest, acceptFriendRequest, rejectFriendRequest, getFriends } from '../redux/slices/friendSlice';
 import { updateUser } from '../redux/slices/userSlice';
+import { fetchUserPosts, clearUserPosts } from '../redux/slices/postSlice';
 
 const Profile = () => {
   const { userId } = useParams();
@@ -42,8 +44,8 @@ const Profile = () => {
   const dispatch = useDispatch();
   const { user: currentUser } = useSelector((state) => state.auth);
   const { friends } = useSelector((state) => state.friends);
+  const { userPosts, isLoading: postsLoading } = useSelector((state) => state.posts);
   const [profileUser, setProfileUser] = useState(null);
-  const [userPosts, setUserPosts] = useState([]);
   const [activeTab, setActiveTab] = useState(0);
   const [isFollowing, setIsFollowing] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -66,28 +68,16 @@ const Profile = () => {
       return;
     }
     fetchProfile();
+    fetchUserPostsData();
     dispatch(getFriends());
+    
+    return () => {
+      dispatch(clearUserPosts());
+    };
   }, [targetUserId, dispatch]);
 
-  useEffect(() => {
-    if (profileUser && currentUser) {
-      // Check if already friends
-      const isFriend = friends.some(friend => friend._id === profileUser._id);
-      setIsFollowing(isFriend);
-      
-      // Check if friend request sent
-      const hasPendingRequest = profileUser.friendRequests?.some(
-        req => req.from === currentUser._id && req.status === 'pending'
-      );
-      setFriendRequestStatus(hasPendingRequest ? 'pending' : null);
-    }
-  }, [profileUser, currentUser, friends]);
-
   const fetchProfile = async () => {
-    if (!targetUserId) {
-      setLoading(false);
-      return;
-    }
+    if (!targetUserId) return;
     
     setLoading(true);
     try {
@@ -102,19 +92,31 @@ const Profile = () => {
       
       const data = await response.json();
       setProfileUser(data);
-      
-      // Fetch user posts
-      const postsResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/posts/user/${targetUserId}`, {
-        headers: { 'x-auth-token': token }
-      });
-      const postsData = await postsResponse.json();
-      setUserPosts(postsData.posts || []);
     } catch (error) {
       console.error('Error fetching profile:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  const fetchUserPostsData = async () => {
+    if (!targetUserId) return;
+    await dispatch(fetchUserPosts(targetUserId));
+  };
+
+  useEffect(() => {
+    if (profileUser && currentUser) {
+      // Check if already friends
+      const isFriend = friends.some(friend => friend._id === profileUser._id);
+      setIsFollowing(isFriend);
+      
+      // Check if friend request sent
+      const hasPendingRequest = profileUser.friendRequests?.some(
+        req => req.from === currentUser._id && req.status === 'pending'
+      );
+      setFriendRequestStatus(hasPendingRequest ? 'pending' : null);
+    }
+  }, [profileUser, currentUser, friends]);
 
   const handleUpdateProfile = async () => {
     const result = await dispatch(updateUser(editForm));
@@ -303,64 +305,130 @@ const Profile = () => {
       {/* Content based on active tab */}
       <Grid container spacing={3}>
         <Grid item xs={12} md={8}>
+          {/* Posts Tab */}
           {activeTab === 0 && (
-            userPosts.length > 0 ? (
-              userPosts.map(post => <PostCard key={post._id} post={post} />)
+            postsLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : userPosts && userPosts.length > 0 ? (
+              userPosts.map((post) => (
+                <PostCard 
+                  key={post._id} 
+                  post={post} 
+                  onPostUpdate={fetchUserPostsData}
+                />
+              ))
             ) : (
               <Paper sx={{ p: 4, textAlign: 'center' }}>
                 <Typography variant="h6" color="text.secondary">No posts yet</Typography>
+                {isOwnProfile && (
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                    Share your first post to connect with friends!
+                  </Typography>
+                )}
               </Paper>
             )
           )}
           
+          {/* Photos Tab */}
+          {activeTab === 1 && (
+            <Paper sx={{ p: 2 }}>
+              <Typography variant="h6" gutterBottom>Photos</Typography>
+              {userPosts && userPosts.filter(p => p.images && p.images.length > 0).length > 0 ? (
+                <Grid container spacing={2}>
+                  {userPosts.map((post) => (
+                    post.images && post.images.map((img, idx) => (
+                      <Grid item xs={6} sm={4} md={3} key={`${post._id}-${idx}`}>
+                        <img 
+                          src={img} 
+                          alt={`post-${idx}`} 
+                          style={{ 
+                            width: '100%', 
+                            height: 150, 
+                            objectFit: 'cover',
+                            borderRadius: 8,
+                            cursor: 'pointer'
+                          }}
+                          onClick={() => window.open(img, '_blank')}
+                        />
+                      </Grid>
+                    ))
+                  ))}
+                </Grid>
+              ) : (
+                <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
+                  No photos yet
+                </Typography>
+              )}
+            </Paper>
+          )}
+          
+          {/* Friends Tab */}
           {activeTab === 2 && (
             <Paper sx={{ p: 2 }}>
-              <Typography variant="h6" gutterBottom>Friends</Typography>
-              <Grid container spacing={2}>
-                {profileUser.friends?.map((friend) => (
-                  <Grid item xs={12} sm={6} key={friend._id}>
-                    <Card>
-                      <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Badge
-                          color="success"
-                          variant="dot"
-                          invisible={!friend.isOnline}
-                        >
-                          <Avatar src={friend.profilePicture} sx={{ width: 50, height: 50 }}>
-                            {friend.name?.charAt(0)}
-                          </Avatar>
-                        </Badge>
-                        <Box>
-                          <Typography variant="subtitle1">{friend.name}</Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {friend.isOnline ? 'Online' : 'Offline'}
-                          </Typography>
-                        </Box>
-                        <Button 
-                          size="small" 
-                          variant="outlined"
-                          onClick={() => navigate(`/profile/${friend._id}`)}
-                          sx={{ ml: 'auto' }}
-                        >
-                          View
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                ))}
-              </Grid>
+              <Typography variant="h6" gutterBottom>Friends ({profileUser.friends?.length || 0})</Typography>
+              {profileUser.friends && profileUser.friends.length > 0 ? (
+                <Grid container spacing={2}>
+                  {profileUser.friends.map((friend) => (
+                    <Grid item xs={12} sm={6} key={friend._id}>
+                      <Card>
+                        <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Badge
+                            color="success"
+                            variant="dot"
+                            invisible={!friend.isOnline}
+                          >
+                            <Avatar src={friend.profilePicture} sx={{ width: 50, height: 50 }}>
+                              {friend.name?.charAt(0)}
+                            </Avatar>
+                          </Badge>
+                          <Box sx={{ flex: 1 }}>
+                            <Typography variant="subtitle1">{friend.name}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {friend.isOnline ? 'Online' : 'Offline'}
+                            </Typography>
+                          </Box>
+                          <Button 
+                            size="small" 
+                            variant="outlined"
+                            onClick={() => navigate(`/profile/${friend._id}`)}
+                          >
+                            View
+                          </Button>
+                          <IconButton size="small" onClick={() => navigate(`/messages/${friend._id}`)}>
+                            <Chat fontSize="small" />
+                          </IconButton>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+              ) : (
+                <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
+                  No friends yet
+                </Typography>
+              )}
             </Paper>
           )}
         </Grid>
         
+        {/* About Section */}
         <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 2 }}>
+          <Paper sx={{ p: 2, position: 'sticky', top: 88 }}>
             <Typography variant="h6" gutterBottom>About</Typography>
+            <Divider sx={{ mb: 2 }} />
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
               <strong>Member since:</strong> {new Date(profileUser.createdAt).toLocaleDateString()}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
               <strong>Last seen:</strong> {profileUser.isOnline ? 'Online now' : profileUser.lastSeen ? new Date(profileUser.lastSeen).toLocaleString() : 'Recently'}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              <strong>Total Posts:</strong> {userPosts?.length || 0}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              <strong>Total Photos:</strong> {userPosts?.filter(p => p.images && p.images.length > 0).reduce((acc, p) => acc + p.images.length, 0) || 0}
             </Typography>
           </Paper>
         </Grid>
